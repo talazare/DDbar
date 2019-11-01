@@ -1,27 +1,31 @@
 import numpy as np
 import pandas as pd
 import pickle
+import multiprocessing as mp
 import matplotlib.pyplot as plt
+
 from ROOT import TH1F, TCanvas
 from root_numpy import fill_hist
 from machine_learning_hep.utilities import create_folder_struc, seldf_singlevar, openfile
+from multiprocessing import Pool, cpu_count
+
 import lz4.frame
 
 #debug = True
 debug = False
 
-dfreco1 = pickle.load(openfile("/data/Derived/D0kINT7HighMultwithJets/vAN-20191003_ROOT6-1/pp_2018_data/260_20191004-0008/skpkldecmerged/AnalysisResultsReco2_4_0.75.pkl.lz4", "rb"))
-dfreco2 = pickle.load(openfile("/data/Derived/D0kINT7HighMultwithJets/vAN-20191003_ROOT6-1/pp_2018_data/260_20191004-0008/skpkldecmerged/AnalysisResultsReco4_6_0.65.pkl.lz4", "rb"))
-dfreco3 = pickle.load(openfile("/data/Derived/D0kINT7HighMultwithJets/vAN-20191003_ROOT6-1/pp_2018_data/260_20191004-0008/skpkldecmerged/AnalysisResultsReco6_8_0.65.pkl.lz4", "rb"))
+dfreco = pickle.load(openfile("/data/Derived/D0kINT7HighMultwithJets/vAN-20191003_ROOT6-1/pp_2018_data/260_20191004-0008/skpkldecmerged/AnalysisResultsReco2_4_0.75.pkl.lz4", "rb"))
+#dfreco2 = pickle.load(openfile("/data/Derived/D0kINT7HighMultwithJets/vAN-20191003_ROOT6-1/pp_2018_data/260_20191004-0008/skpkldecmerged/AnalysisResultsReco4_6_0.65.pkl.lz4", "rb"))
+#dfreco3 = pickle.load(openfile("/data/Derived/D0kINT7HighMultwithJets/vAN-20191003_ROOT6-1/pp_2018_data/260_20191004-0008/skpkldecmerged/AnalysisResultsReco6_8_0.65.pkl.lz4", "rb"))
 #dfreco4 = pickle.load(openfile("/data/Derived/D0kINT7HighMultwithJets/vAN-20191003_ROOT6-1/pp_2018_data/260_20191004-0008/skpkldecmerged/AnalysisResultsReco8_24_0.65.pkl.lz4", "rb"))
-frames = [dfreco1, dfreco2, dfreco3]
-dfreco = pd.concat(frames)
+#frames = [dfreco1, dfreco2, dfreco3]
+#dfreco = pd.concat(frames)
 print("Data loaded")
 print(dfreco.columns)
 dfreco = dfreco.query("y_test_probxgboost>0.8")
 
 if(debug):
-    print("Debug mode: removing events")
+    print("Debug mode: reduced events")
     dfreco = dfreco[:20000]
 print("Size of data", dfreco.shape)
 
@@ -72,9 +76,32 @@ fill_hist(h_pt_cand, dfreco.pt_cand)
 h_pt_cand.Draw()
 cYields.SaveAs("h_pt_cand.pdf")
 
-
-grouped = dfreco.groupby(["run_number","ev_id"])
+#lets try to do groupby as parallelized function over the dataframe
+grouped = dfreco.groupby(["run_number","ev_id"], sort = False)
 #.filter(lambda x: len(x) > 1).groupby(["run_number","ev_id"])
+
+num_cores = cpu_count()
+num_part  = num_cores
+
+def parallelize_df(df, func):
+    df_split = np.array_split(df, num_part)
+    pool = Pool(num_cores)
+    df = pd.concat(pool.map(func, df_split))
+    pool.close()
+    pool.join()
+    return df
+
+def filter_df(df):
+    df = df.groupby(["run_number", "ev_id"], sort = False).filter(lambda x:
+            x.eta_cand.max() - x.eta_cand.min() > 0)
+    return df
+
+filtered = parallelize_df(dfreco, filter_df)
+
+print("paralellizing is done")
+input()
+#grouped = dfreco.groupby(["run_number","ev_id"], sort = False)
+
 grouplen = pd.array([len(group) for name, group in grouped])
 h_grouplen = TH1F("group_length" , "", 5, 1., 6.)
 fill_hist(h_grouplen, grouplen)
@@ -82,9 +109,9 @@ h_grouplen.Draw()
 cYields.SaveAs("h_grouplen.pdf")
 
 filtrated_phi = grouped.filter(lambda x: x.phi_cand.max() - x.phi_cand.min() >
-        0).groupby(["run_number", "ev_id"])
+        0).groupby(["run_number", "ev_id"], sort = False)
 filtrated_eta = grouped.filter(lambda x: x.eta_cand.max() - x.eta_cand.min() >
-        0).groupby(["run_number", "ev_id"])
+        0).groupby(["run_number", "ev_id"], sort = False)
 
 print("Grouped and filtered")
 
