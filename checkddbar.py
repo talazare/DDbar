@@ -24,9 +24,7 @@ frames = [dfreco1, dfreco2, dfreco3]
 dfreco = pd.concat(frames)
 end = time.time()
 print("Data loaded in ", end - start, " time units")
-print(dfreco.columns)
 dfreco = dfreco.query("y_test_probxgboost>0.8")
-
 if(debug):
     print("Debug mode: reduced events")
     dfreco = dfreco[:20000]
@@ -81,14 +79,13 @@ cYields.SaveAs("h_pt_cand.pdf")
 
 #lets try to do groupby as parallelized function over the dataframe
 start = time.time()
-grouped = dfreco.groupby(["run_number","ev_id"], sort = False)
+grouped = dfreco.groupby(["run_number","ev_id"])
 end = time.time()
 print("groupby done in ", end - start, " second")
-#.filter(lambda x: len(x) > 1).groupby(["run_number","ev_id"])
 
 num_cores = int(cpu_count()/2)
 num_part  = num_cores
-print("start parallelizingi with ", num_cores, " cores")
+print("start parallelizing with ", num_cores, " cores")
 def parallelize_df(df, func):
     df_split = np.array_split(df, num_part)
     pool = Pool(num_cores)
@@ -127,14 +124,14 @@ h_grouplen.Draw()
 cYields.SaveAs("h_grouplen.pdf")
 
 #filtrated_phi = grouped.filter(lambda x: x.phi_cand.max() - x.phi_cand.min() >
-#        0).groupby(["run_number", "ev_id"], sort = False)
+#        0).groupby(["run_number", "ev_id"])
 #filtrated_eta = grouped.filter(lambda x: x.eta_cand.max() - x.eta_cand.min() >
-#        0).groupby(["run_number", "ev_id"], sort = False)
+#        0).groupby(["run_number", "ev_id"])
 
 #print("Grouped and filtered")
 
 start = time.time()
-filtrated_phi = filtrated_phi.groupby(["run_number", "ev_id"], sort = False)
+filtrated_phi = filtrated_phi.groupby(["run_number", "ev_id"])
 end1 = time.time()
 phi_vec     = filtrated_phi["phi_cand"]
 d_phi_dist = np.abs(phi_vec.max() - phi_vec.min())
@@ -147,7 +144,7 @@ h_d_phi_cand.Draw()
 cYields.SaveAs("h_d_phi_cand.pdf")
 
 start = time.time()
-filtrated_eta = filtrated_eta.groupby(["run_number", "ev_id"], sort = False)
+filtrated_eta = filtrated_eta.groupby(["run_number", "ev_id"])
 end1 = time.time()
 eta_vec     = filtrated_eta["eta_cand"]
 d_eta_dist = np.abs(eta_vec.max() - eta_vec.min())
