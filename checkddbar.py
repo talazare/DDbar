@@ -112,26 +112,13 @@ start = time.time()
 filtrated_phi = parallelize_df(dfreco, filter_phi)
 end = time.time()
 print("phi filter ", end - start, " second")
-filtered_eta = parallelize_df(dfreco, filter_eta)
+filtrated_eta = parallelize_df(dfreco, filter_eta)
 end2 = time.time()
 print("eta filter ", end2 - end, " second")
 print("paralellizing is done in ", end2 - start, " second")
 
 start = time.time()
-def parallelize_group(df, func):
-    df_split = np.array_split(df, num_part)
-    pool = Pool(num_cores)
-    df = pd.array(pool.map(func, df_split))
-    pool.close()
-    pool.join()
-    return df
-
-def groups(df):
-    df = [len(group) for name, group in grouped]
-    return df
-
-grouplen  = parallelize_group(grouped, grouped)
-#grouplen = pd.array([len(group) for name, group in grouped])
+grouplen = pd.array(grouped.size())
 end = time.time()
 print("creating grouplen array ", end - start, " sec")
 h_grouplen = TH1F("group_length" , "", 5, 1., 6.)
@@ -165,7 +152,7 @@ end1 = time.time()
 eta_vec     = filtrated_eta["eta_cand"]
 d_eta_dist = np.abs(eta_vec.max() - eta_vec.min())
 end2 = time.time()
-print("grouping phi ", end1 - start, " sec")
+print("grouping eta", end1 - start, " sec")
 print("calc dist ", end2 - end1, " sec")
 h_d_eta_cand = TH1F("delta eta cand" , "", 200, 0., 3.)
 fill_hist(h_d_eta_cand, d_eta_dist)
