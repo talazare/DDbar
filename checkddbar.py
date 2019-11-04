@@ -12,8 +12,8 @@ from multiprocessing import Pool, cpu_count
 import lz4.frame
 import time
 
-#debug = True
-debug = False
+debug = True
+#debug = False
 
 start= time.time()
 dfreco1 = pickle.load(openfile("/data/Derived/D0kINT7HighMultwithJets/vAN-20191003_ROOT6-1/pp_2018_data/260_20191004-0008/skpkldecmerged/AnalysisResultsReco2_4_0.75.pkl.lz4", "rb"))
@@ -23,7 +23,7 @@ dfreco3 = pickle.load(openfile("/data/Derived/D0kINT7HighMultwithJets/vAN-201910
 frames = [dfreco1, dfreco2, dfreco3]
 dfreco = pd.concat(frames)
 end = time.time()
-print("Data loaded in ", end - start, " time units")
+print("Data loaded in", end - start, "sec")
 dfreco = dfreco.query("y_test_probxgboost>0.8")
 if(debug):
     print("Debug mode: reduced events")
@@ -81,11 +81,11 @@ cYields.SaveAs("h_pt_cand.pdf")
 start = time.time()
 grouped = dfreco.groupby(["run_number","ev_id"])
 end = time.time()
-print("groupby done in ", end - start, " second")
+print("groupby done in", end - start, "sec")
 
 num_cores = int(cpu_count()/2)
 num_part  = num_cores
-print("start parallelizing with ", num_cores, " cores")
+print("start parallelizing with", num_cores, "cores")
 def parallelize_df(df, func):
     df_split = np.array_split(df, num_part)
     pool = Pool(num_cores)
@@ -106,18 +106,18 @@ def filter_phi(df):
 
 
 start = time.time()
-filtrated_phi = parallelize_df(dfreco, filter_phi)
-end = time.time()
-print("phi filter ", end - start, " second")
 filtrated_eta = parallelize_df(dfreco, filter_eta)
+end = time.time()
+print("eta filter", end - start, "sec")
+filtrated_phi = parallelize_df(dfreco, filter_phi)
 end2 = time.time()
-print("eta filter ", end2 - end, " second")
-print("paralellizing is done in ", end2 - start, " second")
+print("phi filter", end2 - end, "sec")
+print("paralellizing is done in", end2 - start, "sec")
 
 start = time.time()
 grouplen = pd.array(grouped.size())
 end = time.time()
-print("creating grouplen array ", end - start, " sec")
+print("creating grouplen array", end - start, "sec")
 h_grouplen = TH1F("group_length" , "", 5, 1., 6.)
 fill_hist(h_grouplen, grouplen)
 h_grouplen.Draw()
@@ -136,8 +136,8 @@ end1 = time.time()
 phi_vec     = filtrated_phi["phi_cand"]
 d_phi_dist = np.abs(phi_vec.max() - phi_vec.min())
 end2 = time.time()
-print("grouping phi ", end1 - start, " sec")
-print("calc dist ", end2 - end1, " sec")
+print("grouping phi", end1 - start, "sec")
+print("calc dist", end2 - end1, "sec")
 h_d_phi_cand = TH1F("delta phi cand" , "", 200, 0., 5.)
 fill_hist(h_d_phi_cand, d_phi_dist)
 h_d_phi_cand.Draw()
@@ -149,8 +149,8 @@ end1 = time.time()
 eta_vec     = filtrated_eta["eta_cand"]
 d_eta_dist = np.abs(eta_vec.max() - eta_vec.min())
 end2 = time.time()
-print("grouping eta", end1 - start, " sec")
-print("calc dist ", end2 - end1, " sec")
+print("grouping eta", end1 - start, "sec")
+print("calc dist", end2 - end1, "sec")
 h_d_eta_cand = TH1F("delta eta cand" , "", 200, 0., 3.)
 fill_hist(h_d_eta_cand, d_eta_dist)
 h_d_eta_cand.Draw()
