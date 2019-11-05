@@ -99,6 +99,7 @@ print("groupby done in", end - start, "sec")
 
 num_cores = int(cpu_count()/2)
 num_part  = num_cores
+
 print("start parallelizing with", num_cores, "cores")
 def parallelize_df(df, func):
     df_split = np.array_split(df, num_part)
@@ -106,6 +107,10 @@ def parallelize_df(df, func):
     df = pd.concat(pool.map(func, df_split))
     pool.close()
     pool.join()
+    return df
+
+def filter_invmass(df):
+    df = df.groupby(["inv_mass"]).filter(lambda x: x["inv_mass"] > 0)
     return df
 
 def filter_eta(df):
@@ -117,6 +122,18 @@ def filter_phi(df):
     df = df.groupby(["run_number", "ev_id"], sort = False).filter(lambda x:
             x.phi_cand.max() - x.phi_cand.min() > 0)
     return df
+
+start = time.time()
+filtrated_invmass = parallelize_df(dfreco, filter_invmass)
+end = time.time()
+print("invmass filter", end - start, "sec")
+
+cYields = TCanvas('cYields', 'The Fit Canvas')
+h_invmass_filtr = TH1F("invariant mass filtered" , "", 200, 1.64, 2.1)
+fill_hist(h_invmass, filtrated_invmass.inv_mass)
+h_invmass_filtr.Draw()
+cYields.SaveAs("h_invmass_filtr.pdf")
+
 
 start = time.time()
 filtrated_eta = parallelize_df(dfreco, filter_eta)
