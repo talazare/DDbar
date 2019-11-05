@@ -55,24 +55,20 @@ fill_hist(h_pt_prong0, dfreco.pt_prong0)
 h_pt_prong0.Draw()
 cYields.SaveAs("h_pt_prong0.pdf")
 
-
 h_pt_prong1 = TH1F("pt prong_1" , "", 200, 0.8, 8.)
 fill_hist(h_pt_prong1, dfreco.pt_prong1)
 h_pt_prong1.Draw()
 cYields.SaveAs("h_pt_prong1.pdf")
-
 
 h_eta_prong0 = TH1F("eta prong_0" , "", 200, 0., 0.9)
 fill_hist(h_eta_prong0, dfreco.eta_prong0)
 h_eta_prong0.Draw()
 cYields.SaveAs("h_eta_prong0.pdf")
 
-
 h_eta_prong1 = TH1F("eta prong_1" , "", 200, 0., 0.9)
 fill_hist(h_eta_prong1, dfreco.eta_prong1)
 h_eta_prong1.Draw()
 cYields.SaveAs("h_eta_prong1.pdf")
-
 
 h_eta_cand = TH1F("eta cand" , "", 200, 0., 0.9)
 fill_hist(h_eta_cand, dfreco.eta_cand)
@@ -84,12 +80,10 @@ fill_hist(h_phi_cand, dfreco.phi_cand)
 h_phi_cand.Draw()
 cYields.SaveAs("h_phi_cand.pdf")
 
-
 h_pt_cand = TH1F("pt cand" , "", 200, 2., 8.)
 fill_hist(h_pt_cand, dfreco.pt_cand)
 h_pt_cand.Draw()
 cYields.SaveAs("h_pt_cand.pdf")
-
 
 #lets try to do groupby as parallelized function over the dataframe
 start = time.time()
@@ -98,7 +92,7 @@ end = time.time()
 print("groupby done in", end - start, "sec")
 
 num_cores = int(cpu_count()/2)
-num_part  = num_cores
+num_part  = num_cores*2
 
 print("start parallelizing with", num_cores, "cores")
 def parallelize_df(df, func):
@@ -109,8 +103,10 @@ def parallelize_df(df, func):
     pool.join()
     return df
 
+
 def filter_invmass(df):
-    df = df.groupby(["inv_mass"]).filter(lambda x: x["inv_mass"] > 0)
+    df = df.groupby(["inv_mass"]).filter(lambda x: len(x) - np.exp(par[0] +
+        par[1] * x.inv_mass.max()) > 0)
     return df
 
 def filter_eta(df):
@@ -124,22 +120,24 @@ def filter_phi(df):
     return df
 
 start = time.time()
-filtrated_invmass = parallelize_df(dfreco, filter_invmass)
+filtrated_invmass = parallelize_df(dfreco, filter_invmass).describe()
 end = time.time()
 print("invmass filter", end - start, "sec")
 
 cYields = TCanvas('cYields', 'The Fit Canvas')
 h_invmass_filtr = TH1F("invariant mass filtered" , "", 200, 1.64, 2.1)
-fill_hist(h_invmass, filtrated_invmass.inv_mass)
+inv_vec = filtrated_invmass["inv_mass"]
+print("vector of invarian masses", inv_vec)
+fill_hist(h_invmass_filtr, inv_vec)
 h_invmass_filtr.Draw()
 cYields.SaveAs("h_invmass_filtr.pdf")
 
-
+input()
 start = time.time()
 filtrated_eta = parallelize_df(dfreco, filter_eta)
 end = time.time()
 print("eta filter", end - start, "sec")
-filtrated_phi = parallelize_df(dfreco, filter_phi)
+filtrated_phi = parallelize_df(filtrated_invmass, filter_phi)
 end2 = time.time()
 print("phi filter", end2 - end, "sec")
 print("paralellizing is done in", end2 - start, "sec")
