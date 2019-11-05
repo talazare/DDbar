@@ -4,7 +4,7 @@ import pickle
 import multiprocessing as mp
 import matplotlib.pyplot as plt
 
-from ROOT import TH1F, TCanvas
+from ROOT import TH1F, TF1, TCanvas
 from root_numpy import fill_hist
 from machine_learning_hep.utilities import create_folder_struc, seldf_singlevar, openfile
 from multiprocessing import Pool, cpu_count
@@ -12,8 +12,8 @@ from multiprocessing import Pool, cpu_count
 import lz4.frame
 import time
 
-debug = True
-#debug = False
+#debug = True
+debug = False
 
 start= time.time()
 dfreco1 = pickle.load(openfile("/data/Derived/D0kINT7HighMultwithJets/vAN-20191003_ROOT6-1/pp_2018_data/260_20191004-0008/skpkldecmerged/AnalysisResultsReco2_4_0.75.pkl.lz4", "rb"))
@@ -30,10 +30,23 @@ if(debug):
     dfreco = dfreco[:20000]
 print("Size of data", dfreco.shape)
 
+fit_fun1 = TF1("fit_fun1", "expo" ,1.64, 1.82)
+fit_fun2 = TF1("fit_fun2", "gaus", 1.82, 1.92)
+extrapolate = TF1("extrapolate", "expo", 1.92, 2.1)
+fit_total = TF1("fit_total", "expo(0) + gaus(2) + expo(5)", 1.64, 2.1)
 cYields = TCanvas('cYields', 'The Fit Canvas')
-
 h_invmass = TH1F("invariant mass" , "", 200, 1.64, 2.1)
 fill_hist(h_invmass, dfreco.inv_mass)
+h_invmass.Fit(fit_fun1, "R")
+par1 = fit_fun1.GetParameters()
+print("parameters for expo", par1[0], par1[1])
+h_invmass.Fit(fit_fun2, "R+")
+par2 = fit_fun2.GetParameters()
+print("parameters for gaus", par2[0], par2[1], par2[2])
+fit_total.SetParameters(par1[0], par1[1], par2[0], par2[1], par2[2], par1[0],
+        par1[1])
+h_invmass.Fit(fit_total,"R+")
+par = fit_total.GetParameters()
 h_invmass.Draw()
 cYields.SaveAs("h_invmass.pdf")
 
@@ -77,6 +90,7 @@ fill_hist(h_pt_cand, dfreco.pt_cand)
 h_pt_cand.Draw()
 cYields.SaveAs("h_pt_cand.pdf")
 
+
 #lets try to do groupby as parallelized function over the dataframe
 start = time.time()
 grouped = dfreco.groupby(["run_number","ev_id"])
@@ -103,7 +117,6 @@ def filter_phi(df):
     df = df.groupby(["run_number", "ev_id"], sort = False).filter(lambda x:
             x.phi_cand.max() - x.phi_cand.min() > 0)
     return df
-
 
 start = time.time()
 filtrated_eta = parallelize_df(dfreco, filter_eta)
@@ -140,6 +153,7 @@ print("grouping phi", end1 - start, "sec")
 print("calc dist", end2 - end1, "sec")
 h_d_phi_cand = TH1F("delta phi cand" , "", 200, 0., 5.)
 fill_hist(h_d_phi_cand, d_phi_dist)
+cYields.SetLogy(True)
 h_d_phi_cand.Draw()
 cYields.SaveAs("h_d_phi_cand.pdf")
 
