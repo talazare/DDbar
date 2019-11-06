@@ -12,8 +12,8 @@ from multiprocessing import Pool, cpu_count
 import lz4.frame
 import time
 
-#debug = True
-debug = False
+debug = True
+#debug = False
 
 start= time.time()
 dfreco1 = pickle.load(openfile("/data/Derived/D0kINT7HighMultwithJets/vAN-20191003_ROOT6-1/pp_2018_data/260_20191004-0008/skpkldecmerged/AnalysisResultsReco2_4_0.75.pkl.lz4", "rb"))
@@ -24,18 +24,21 @@ frames = [dfreco1, dfreco2, dfreco3]
 dfreco = pd.concat(frames)
 end = time.time()
 print("Data loaded in", end - start, "sec")
+
 dfreco = dfreco.query("y_test_probxgboost>0.8")
+
 if(debug):
     print("Debug mode: reduced events")
     dfreco = dfreco[:20000]
 print("Size of data", dfreco.shape)
 
+binning = 200
 fit_fun1 = TF1("fit_fun1", "expo" ,1.64, 1.82)
 fit_fun2 = TF1("fit_fun2", "gaus", 1.82, 1.92)
-extrapolate = TF1("extrapolate", "expo", 1.92, 2.1)
 fit_total = TF1("fit_total", "expo(0) + gaus(2) + expo(5)", 1.64, 2.1)
 cYields = TCanvas('cYields', 'The Fit Canvas')
-h_invmass = TH1F("invariant mass" , "", 200, 1.64, 2.1)
+h_invmass = TH1F("invariant mass" , "", binning, dfreco.inv_mass.min(),
+        dfreco.inv_mass.max())
 fill_hist(h_invmass, dfreco.inv_mass)
 h_invmass.Fit(fit_fun1, "R")
 par1 = fit_fun1.GetParameters()
@@ -43,8 +46,7 @@ print("parameters for expo", par1[0], par1[1])
 h_invmass.Fit(fit_fun2, "R+")
 par2 = fit_fun2.GetParameters()
 print("parameters for gaus", par2[0], par2[1], par2[2])
-fit_total.SetParameters(par1[0], par1[1], par2[0], par2[1], par2[2], par1[0],
-        par1[1])
+fit_total.SetParameters(par1[0], par1[1], par2[0], par2[1], par2[2], par1[0],par1[1])
 h_invmass.Fit(fit_total,"R+")
 par = fit_total.GetParameters()
 h_invmass.Draw()
@@ -103,11 +105,38 @@ def parallelize_df(df, func):
     pool.join()
     return df
 
+start = time.time()
+inv_range = dfreco.inv_mass.max() - dfreco.inv_mass.min()
+end = time.time()
+print("inv_range", inv_range, "done in", start-end, "sec")
+bin_size = inv_range/binning
+end2 = time.time()
+bins_arr = [bins for bins in np.arange (dfreco.inv_mass.min(),
+        dfreco.inv_mass.max(), bin_size)]
+print("bins array created in", end2-end, "sec")
+
+#idx = pd.cut(dfreco.inv_mass, bins=np.arange(dfreco.inv_mass.min(), dfreco.inv_mass.max(), bin_size),
+#                      include_lowest=True, right=False)
+#groups = dfreco.groupby(idx, as_index = False)
+#for name, group in groups:
+#    result = np.exp(par[0] + par[1]*group.inv_mass.mean())
+#    print("group_len", len(group), "inv_mass mean", group.inv_mass.mean(), "result of grop thing", result)
+
+#grouped_inv = dfreco.groupby(idx, as_index = False)
+#print("invmass grouped")
+#for name, group in grouped_inv:
+#    print(len(group))
 
 def filter_invmass(df):
-    df = df.groupby(["inv_mass"]).filter(lambda x: len(x) - np.exp(par[0] +
-        par[1] * x.inv_mass.max()) > 0)
-    return df
+  idx = pd.cut(df.inv_mass, bins=np.arange(dfreco.inv_mass.min(), dfreco.inv_mass.max(), bin_size),
+                      include_lowest=True, right=False)
+  groups = df.groupby(idx, as_index = False)
+  for name, group in groups:
+      print(len(group))
+  df = df.groupby(idx, as_index = False).filter(lambda x: len(x) - np.exp(par[0] +
+        par[1] * x.inv_mass.mean()) > 0)
+  print(df.describe())
+  return df
 
 def filter_eta(df):
     df = df.groupby(["run_number", "ev_id"], sort = False).filter(lambda x:
@@ -120,13 +149,15 @@ def filter_phi(df):
     return df
 
 start = time.time()
-filtrated_invmass = parallelize_df(dfreco, filter_invmass).describe()
+filtrated_invmass = parallelize_df(dfreco, filter_invmass)
 end = time.time()
 print("invmass filter", end - start, "sec")
-
-cYields = TCanvas('cYields', 'The Fit Canvas')
-h_invmass_filtr = TH1F("invariant mass filtered" , "", 200, 1.64, 2.1)
 inv_vec = filtrated_invmass["inv_mass"]
+print("inv_vec", inv_vec)
+#filtrated_invmass = filtrated_invmass.groupby(["inv_mass"])
+cYields = TCanvas('cYields', 'The Fit Canvas')
+h_invmass_filtr = TH1F("invariant mass filtered" , "", binning,
+        dfreco.inv_mass.min(), dfreco.inv_mass.max())
 print("vector of invarian masses", inv_vec)
 fill_hist(h_invmass_filtr, inv_vec)
 h_invmass_filtr.Draw()
