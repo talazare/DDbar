@@ -5,6 +5,7 @@ import multiprocessing as mp
 import matplotlib.pyplot as plt
 
 from ROOT import TH1F, TH2F, TF1, TCanvas
+from ROOT import kBlack, kBlue, kRed
 from root_numpy import fill_hist
 from machine_learning_hep.utilities import create_folder_struc, seldf_singlevar, openfile
 from multiprocessing import Pool, cpu_count
@@ -12,15 +13,16 @@ from multiprocessing import Pool, cpu_count
 import lz4.frame
 import time
 
-debug = True
-#debug = False
+#debug = True
+debug = False
 
 #plots = True
 plots = False
+
 start= time.time()
 
 if (debug):
-    dfreco = pickle.load(openfile("/data/Derived/D0kINT7HighMultwithJets/vAN-20191003_ROOT6-1/pp_2018_data/260_20191004-0008/skpkldecmerged/AnalysisResultsReco6_8_0.65.pkl.lz4", "rb"))
+    dframe= pickle.load(openfile("/data/Derived/D0kINT7HighMultwithJets/vAN-20191003_ROOT6-1/pp_2018_data/260_20191004-0008/skpkldecmerged/AnalysisResultsReco6_8_0.65.pkl.lz4", "rb"))
 
 else:
     dfreco1 = pickle.load(openfile("/data/Derived/D0kINT7HighMultwithJets/vAN-20191003_ROOT6-1/pp_2018_data/260_20191004-0008/skpkldecmerged/AnalysisResultsReco2_4_0.75.pkl.lz4", "rb"))
@@ -28,19 +30,21 @@ else:
     dfreco3 = pickle.load(openfile("/data/Derived/D0kINT7HighMultwithJets/vAN-20191003_ROOT6-1/pp_2018_data/260_20191004-0008/skpkldecmerged/AnalysisResultsReco6_8_0.65.pkl.lz4", "rb"))
     dfreco4 = pickle.load(openfile("/data/Derived/D0kINT7HighMultwithJets/vAN-20191003_ROOT6-1/pp_2018_data/260_20191004-0008/skpkldecmerged/AnalysisResultsReco8_24_0.45.pkl.lz4", "rb"))
     frames = [dfreco1, dfreco2, dfreco3, dfreco4]
-    dfreco = pd.concat(frames)
+    dframe = pd.concat(frames)
 
-dfreco = dfreco.query("y_test_probxgboost>0.8")
+dframe = dframe.query("y_test_probxgboost>0.8")
+dfreco = dframe.reset_index(drop = True)
 
 end = time.time()
 print("Data loaded in", end - start, "sec")
 
 if(debug):
     print("Debug mode: reduced data")
-    dfreco = dfreco[:20000]
+    dfreco = dfreco[:5000]
 print("Size of data", dfreco.shape)
 
 print(dfreco.columns)
+
 binning = 200
 
 cYields = TCanvas('cYields', 'The Fit Canvas')
@@ -148,7 +152,6 @@ start = time.time()
 grouped = dfreco.groupby(["run_number","ev_id"])
 end = time.time()
 print("groupby done in", end - start, "sec")
-
 start = time.time()
 grouplen = pd.array(grouped.size())
 end = time.time()
@@ -177,6 +180,7 @@ cYields.SaveAs("h_grouplen.png")
 
 
 #parallelized functions over the dataframe
+
 num_cores = int(cpu_count()/2)
 num_part  = num_cores*2
 
@@ -196,16 +200,20 @@ def filter_eta(df):
 
 def filter_phi(df):
     df = df.groupby(["run_number", "ev_id"], sort = False).filter(lambda x:
-            x.phi_cand.max() - x.phi_cand.min() > 0)
+            x.phi_cand.max() - x.phi_cand.min() > 5.5)
     return df
 
 start = time.time()
-filtrated_eta = parallelize_df(dfreco, filter_eta)
-end = time.time()
-print("eta filter", end - start, "sec")
+#filtrated_eta = parallelize_df(dfreco, filter_eta)
+#
+#end = time.time()
+#print("eta filter", end - start, "sec")
+
 filtrated_phi = parallelize_df(dfreco, filter_phi)
+
 end2 = time.time()
-print("phi filter", end2 - end, "sec")
+#print("phi filter", end2 - end "sec")
+
 print("paralellizing is done in", end2 - start, "sec")
 
 #filtrated_phi = grouped.filter(lambda x: x.phi_cand.max() - x.phi_cand.min() >
@@ -215,18 +223,33 @@ print("paralellizing is done in", end2 - start, "sec")
 
 #print("Grouped and filtered")
 
-start = time.time()
-filtrated_phi = filtrated_phi.groupby(["run_number", "ev_id"])
-end1 = time.time()
-phi_vec     = filtrated_phi["phi_cand"]
-inv_vec     = filtrated_phi["inv_mass"]
-eta_phi_vec = filtrated_phi["eta_cand"]
-d_phi_dist = np.abs(phi_vec.max() - phi_vec.min())
-d_inv_dist = np.abs(inv_vec.max() - inv_vec.min())
-d_eta_phi_dist = np.abs(eta_phi_vec.max() - eta_phi_vec.min())
-end2 = time.time()
-print("grouping phi", end1 - start, "sec")
-print("calc dist", end2 - end1, "sec")
+grouped_phi = filtrated_phi.groupby(["run_number", "ev_id"])
+phi_vec     = grouped_phi["phi_cand"]
+
+d_phi_dist = np.abs(phi_vec.max() - phi_vec.min()) #delta phi destribution as difference between max and min phi in the group
+
+# find positions of max and min elements in group
+min_idx_vec = phi_vec.idxmin()
+max_idx_vec = phi_vec.idxmax()
+
+new_df_min = filtrated_phi.loc[min_idx_vec,]
+print("compare length of min elements amount and length of new df",
+        len(min_idx_vec), len(new_df_min))
+
+new_df_max = filtrated_phi.loc[max_idx_vec,]
+print("compare length of min elements amount and length of new df",
+        len(max_idx_vec), len(new_df_max))
+
+eta_max_vec = new_df_max["eta_cand"]
+eta_min_vec = new_df_min["eta_cand"]
+
+inv_mass_max_vec = new_df_max["inv_mass"]
+inv_mass_min_vec = new_df_min["inv_mass"]
+
+pt_max_vec = new_df_max["pt_cand"]
+pt_min_vec = new_df_min["pt_cand"]
+
+
 h_d_phi_cand = TH1F("delta phi cand" , "", 200, d_phi_dist.min(),
         d_phi_dist.max())
 fill_hist(h_d_phi_cand, d_phi_dist)
@@ -234,29 +257,61 @@ cYields.SetLogy(True)
 h_d_phi_cand.Draw()
 cYields.SaveAs("h_d_phi_cand.png")
 
-cYields = TCanvas('cYields', 'The Fit Canvas')
-h_invmass_phi = TH2F("invariant mass/delta phi" , "", 200,
-        d_inv_dist.min(), d_inv_dist.max(), 200, d_phi_dist.min(), d_phi_dist.max())
-inv_phi = np.column_stack((d_inv_dist, d_phi_dist))
-fill_hist(h_invmass_phi, inv_phi)
-h_invmass_phi.Draw("BOX")
-cYields.SaveAs("h_invmass_phi.png")
+cYields.SetLogy(False)
+h_first_cand_mass = TH1F("inv_mass of the first cand" , "", 200,
+        inv_mass_max_vec.min(), inv_mass_max_vec.max())
+fill_hist(h_first_cand_mass, inv_mass_max_vec)
+h_second_cand_mass = TH1F("inv_mass of the second cand" , "", 200,
+        inv_mass_min_vec.min(), inv_mass_min_vec.max())
+fill_hist(h_second_cand_mass, inv_mass_min_vec)
+h_first_cand_mass.SetLineColor(kRed)
+h_second_cand_mass.SetLineColor(kBlue)
+h_first_cand_mass.Draw()
+h_second_cand_mass.Draw("same")
+cYields.SaveAs("h_inv_mass_cand.png")
 
+h_first_cand_pt = TH1F("pt of the first cand" , "", 200,
+        pt_max_vec.min(), pt_max_vec.max())
+fill_hist(h_first_cand_pt, pt_max_vec)
+h_second_cand_pt = TH1F("pt of the second cand" , "", 200,
+        pt_min_vec.min(),pt_min_vec.max())
+fill_hist(h_second_cand_pt, pt_min_vec)
+h_first_cand_pt.SetLineColor(kRed)
+h_second_cand_pt.SetLineColor(kBlue)
+h_first_cand_pt.Draw()
+h_second_cand_pt.Draw("same")
+cYields.SaveAs("h_pt_cand_max_min.png")
 
-start = time.time()
-filtrated_eta = filtrated_eta.groupby(["run_number", "ev_id"])
-end1 = time.time()
-eta_vec     = filtrated_eta["eta_cand"]
-d_eta_dist = np.abs(eta_vec.max() - eta_vec.min())
-end2 = time.time()
-print("grouping eta", end1 - start, "sec")
-print("calc dist", end2 - end1, "sec")
-h_d_eta_cand = TH1F("delta eta cand" , "", 200, 0., 3.)
-fill_hist(h_d_eta_cand, d_eta_dist)
-cYields.SetLogy(True)
-h_d_eta_cand.Draw()
-cYields.SaveAs("h_d_eta_cand.png")
+h_first_cand_eta = TH1F("eta of the first cand" , "", 200,
+        eta_max_vec.min(), eta_max_vec.max())
+fill_hist(h_first_cand_eta, eta_max_vec)
+h_second_cand_eta = TH1F("eta of the second cand" , "", 200,
+        eta_min_vec.min(), eta_min_vec.max())
+fill_hist(h_second_cand_eta, eta_min_vec)
+h_first_cand_eta.SetLineColor(kRed)
+h_second_cand_eta.SetLineColor(kBlue)
+h_first_cand_eta.Draw()
+h_second_cand_eta.Draw("same")
+cYields.SaveAs("h_eta_cand_max_min.png")
 
+#start = time.time()
+#filtrated_eta = filtrated_eta.groupby(["run_number", "ev_id"])
+#end1 = time.time()
+#eta_vec     = filtrated_eta["eta_cand"]
+#d_eta_dist = np.abs(eta_vec.max() - eta_vec.min())
+#end2 = time.time()
+#print("grouping eta", end1 - start, "sec")
+#print("calc dist", end2 - end1, "sec")
+#h_d_eta_cand = TH1F("delta eta cand" , "", 200, d_eta_dist.min(),
+#        d_eta_dist.max())
+#fill_hist(h_d_eta_cand, d_eta_dist)
+#cYields.SetLogy(True)
+#h_d_eta_cand.Draw()
+#cYields.SaveAs("h_d_eta_cand.png")
+
+d_eta_phi_dist = np.abs(eta_max_vec.values - eta_min_vec.values)
+
+print(d_eta_phi_dist)
 cYields = TCanvas('cYields', 'The Fit Canvas')
 h_eta_phi = TH2F("delta eta/delta phi" , "", 200,
         d_eta_phi_dist.min(), d_eta_phi_dist.max(), 200, d_phi_dist.min(), d_phi_dist.max())
