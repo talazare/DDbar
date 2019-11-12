@@ -5,7 +5,7 @@ import multiprocessing as mp
 import matplotlib.pyplot as plt
 
 from ROOT import TH1F, TH2F, TF1, TCanvas
-from ROOT import kBlack, kBlue, kRed, kGreen, kMagenta, TLegend
+from ROOT import kBlack, kBlue, kRed
 from root_numpy import fill_hist
 from machine_learning_hep.utilities import create_folder_struc, seldf_singlevar, openfile
 from multiprocessing import Pool, cpu_count
@@ -19,28 +19,24 @@ debug = False
 plots = True
 #plots = False
 
-make_phi_compare = True
-#make_phi_compare = False
-
 d_phi_cut = 0.
 
 start= time.time()
 
 if (debug):
-    dframe = pickle.load(openfile("/data/Derived/D0kINT7HighMultwithJets/vAN-20191003_ROOT6-1/pp_2018_data/260_20191004-0008/skpkldecmerged/AnalysisResultsReco4_6_0.65.pkl.lz4", "rb"))
+    dframe= pickle.load(openfile("/data/Derived/D0kINT7HighMultwithJets/vAN-20191003_ROOT6-1/pp_2018_data/260_20191004-0008/skpkldecmerged/AnalysisResultsReco6_8_0.65.pkl.lz4", "rb"))
 
 else:
-    dfreco0 = pickle.load(openfile("/data/Derived/D0kINT7HighMultwithJets/vAN-20191003_ROOT6-1/pp_2018_data/260_20191004-0008/skpkldecmerged/AnalysisResultsReco1_2_0.75.pkl.lz4", "rb"))
     dfreco1 = pickle.load(openfile("/data/Derived/D0kINT7HighMultwithJets/vAN-20191003_ROOT6-1/pp_2018_data/260_20191004-0008/skpkldecmerged/AnalysisResultsReco2_4_0.75.pkl.lz4", "rb"))
     dfreco2 = pickle.load(openfile("/data/Derived/D0kINT7HighMultwithJets/vAN-20191003_ROOT6-1/pp_2018_data/260_20191004-0008/skpkldecmerged/AnalysisResultsReco4_6_0.65.pkl.lz4", "rb"))
     dfreco3 = pickle.load(openfile("/data/Derived/D0kINT7HighMultwithJets/vAN-20191003_ROOT6-1/pp_2018_data/260_20191004-0008/skpkldecmerged/AnalysisResultsReco6_8_0.65.pkl.lz4", "rb"))
     dfreco4 = pickle.load(openfile("/data/Derived/D0kINT7HighMultwithJets/vAN-20191003_ROOT6-1/pp_2018_data/260_20191004-0008/skpkldecmerged/AnalysisResultsReco8_24_0.45.pkl.lz4", "rb"))
-    frames = [dfreco0, dfreco1, dfreco2, dfreco3, dfreco4]
+    frames = [dfreco1, dfreco2, dfreco3, dfreco4]
     dframe = pd.concat(frames)
 
 dframe = dframe.query("y_test_probxgboost>0.5")
-#dframe = dframe.query("pt_cand > 4")
-#dframe = dframe.query("pt_cand < 10")
+dframe = dframe.query("pt_cand < 2")
+#dframe = dframe.query("pt_cand < 4")
 dfreco = dframe.reset_index(drop = True)
 
 end = time.time()
@@ -231,8 +227,6 @@ print("paralellizing is done in", end2 - start, "sec")
 
 #print("Grouped and filtered")
 
-
-
 grouped_phi = filtrated_phi.groupby(["run_number", "ev_id"])
 phi_vec     = grouped_phi["phi_cand"]
 
@@ -259,104 +253,13 @@ inv_mass_min_vec = new_df_min["inv_mass"]
 pt_max_vec = new_df_max["pt_cand"]
 pt_min_vec = new_df_min["pt_cand"]
 
-#h_d_phi_cand = TH1F("delta phi cand" , "", 200, d_phi_dist.min(),
-#        d_phi_dist.max())
-#fill_hist(h_d_phi_cand, d_phi_dist)
-#cYields.SetLogy(True)
-#h_d_phi_cand.Draw()
-#cYields.SaveAs("h_d_phi_cand.png")
 
-if (make_phi_compare):
-    cYields_2 = TCanvas('cYields_2', 'The Fit Canvas 2')
-
-    filtrated_phi_1 = filtrated_phi.query("pt_cand < 2")
-
-    grouped_phi_1 = filtrated_phi_1.groupby(["run_number", "ev_id"])
-    phi_vec_1     = grouped_phi_1["phi_cand"]
-
-    d_phi_dist_1 = np.abs(phi_vec_1.max() - phi_vec_1.min()) #delta phi destribution as difference between max and min phi in the group
-
-    filtrated_phi_2 = filtrated_phi.query("pt_cand > 2")
-    filtrated_phi_2 = filtrated_phi_2.query("pt_cand < 3")
-
-    grouped_phi_2 = filtrated_phi_2.groupby(["run_number", "ev_id"])
-    phi_vec_2     = grouped_phi_2["phi_cand"]
-
-    d_phi_dist_2 = np.abs(phi_vec_2.max() - phi_vec_2.min()) #delta phi destribution as difference between max and min phi in the group
-
-    filtrated_phi_3 = filtrated_phi.query("pt_cand < 4")
-    filtrated_phi_3 = filtrated_phi_3.query("pt_cand > 3")
-
-    grouped_phi_3 = filtrated_phi_3.groupby(["run_number", "ev_id"])
-    phi_vec_3     = grouped_phi_3["phi_cand"]
-
-    d_phi_dist_3 = np.abs(phi_vec_3.max() - phi_vec_3.min()) #delta phi destribution as difference between max and min phi in the group
-
-    filtrated_phi_4 = filtrated_phi.query("pt_cand < 5")
-    filtrated_phi_4 = filtrated_phi_4.query("pt_cand > 4")
-
-    grouped_phi_4 = filtrated_phi_4.groupby(["run_number", "ev_id"])
-    phi_vec_4     = grouped_phi_4["phi_cand"]
-
-    d_phi_dist_4 = np.abs(phi_vec_4.max() - phi_vec_4.min()) #delta phi destribution as difference between max and min phi in the group
-
-    filtrated_phi_5 = filtrated_phi.query("pt_cand < 6")
-    filtrated_phi_5 = filtrated_phi_5.query("pt_cand > 5")
-
-    grouped_phi_5 = filtrated_phi_5.groupby(["run_number", "ev_id"])
-    phi_vec_5     = grouped_phi_5["phi_cand"]
-
-    d_phi_dist_5 = np.abs(phi_vec_5.max() - phi_vec_5.min()) #delta phi destribution as difference between max and min phi in the group
-
-    h_d_phi_cand_1 = TH1F("delta phi cand, pt range:[1-2]" , "Normalized plot", 200,
-            d_phi_dist_1.min(), d_phi_dist_1.max())
-    fill_hist(h_d_phi_cand_1, d_phi_dist_1)
-    h_d_phi_cand_1.Scale(1/ h_d_phi_cand_1.Integral())
-    h_d_phi_cand_2 = TH1F("delta phi cand, pt range:[2-3]" , "", 200,
-            d_phi_dist_1.min(), d_phi_dist_1.max())
-    fill_hist(h_d_phi_cand_2, d_phi_dist_2)
-    h_d_phi_cand_2.Scale(1/ h_d_phi_cand_2.Integral())
-    h_d_phi_cand_3 = TH1F("delta phi cand, pt range:[3-4]" , "", 200,
-            d_phi_dist_1.min(), d_phi_dist_1.max())
-    fill_hist(h_d_phi_cand_3, d_phi_dist_3)
-    h_d_phi_cand_3.Scale(1/ h_d_phi_cand_3.Integral())
-    h_d_phi_cand_4 = TH1F("delta phi cand, pt range:[4-5]" , "", 200,
-            d_phi_dist_1.min(), d_phi_dist_1.max())
-    fill_hist(h_d_phi_cand_4, d_phi_dist_4)
-    h_d_phi_cand_4.Scale(1/ h_d_phi_cand_4.Integral())
-    h_d_phi_cand_5 = TH1F("delta phi cand, pt range:[5-6]" , "", 200,
-            d_phi_dist_1.min(), d_phi_dist_1.max())
-    fill_hist(h_d_phi_cand_5, d_phi_dist_5)
-    h_d_phi_cand_5.Scale(1/ h_d_phi_cand_5.Integral())
-    cYields_2.SetLogy(True)
-    h_d_phi_cand_1.SetStats(0)
-    h_d_phi_cand_1.SetLineColor(kBlack)
-    h_d_phi_cand_1.Draw()
-    h_d_phi_cand_2.SetStats(0)
-    h_d_phi_cand_2.SetLineColor(kRed)
-    h_d_phi_cand_2.Draw("same")
-    h_d_phi_cand_3.SetStats(0)
-    h_d_phi_cand_3.SetLineColor(kBlue)
-    h_d_phi_cand_3.Draw("same")
-    h_d_phi_cand_4.SetStats(0)
-    h_d_phi_cand_4.SetLineColor(kGreen)
-    h_d_phi_cand_4.Draw("same")
-    h_d_phi_cand_5.SetStats(0)
-    h_d_phi_cand_5.SetLineColor(kMagenta)
-    h_d_phi_cand_5.Draw("same")
-    leg = TLegend(0.45, 0.7, 0.95, 0.87)
-    leg.SetBorderSize(0)
-    leg.SetFillColor(0)
-    leg.SetFillStyle(0)
-    leg.SetTextFont(42)
-    leg.SetTextSize(0.035)
-    leg.AddEntry(h_d_phi_cand_1, h_d_phi_cand_1.GetName(),"L")
-    leg.AddEntry(h_d_phi_cand_2, h_d_phi_cand_2.GetName(),"L")
-    leg.AddEntry(h_d_phi_cand_3, h_d_phi_cand_3.GetName(),"L")
-    leg.AddEntry(h_d_phi_cand_4, h_d_phi_cand_4.GetName(),"L")
-    leg.AddEntry(h_d_phi_cand_5, h_d_phi_cand_5.GetName(),"L")
-    leg.Draw("same")
-    cYields_2.SaveAs("h_d_phi_cand_compare.png")
+h_d_phi_cand = TH1F("delta phi cand" , "", 200, d_phi_dist.min(),
+        d_phi_dist.max())
+fill_hist(h_d_phi_cand, d_phi_dist)
+cYields.SetLogy(True)
+h_d_phi_cand.Draw()
+cYields.SaveAs("h_d_phi_cand.png")
 
 cYields.SetLogy(False)
 h_first_cand_mass = TH1F("inv_mass of the first cand" , "", 200,
