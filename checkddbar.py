@@ -13,11 +13,11 @@ from multiprocessing import Pool, cpu_count
 import lz4.frame
 import time
 
-#debug = True
-debug = False
+debug = True
+#debug = False
 
-#plots = True
-plots = False
+plots = True
+#plots = False
 
 #make_phi_compare = True
 make_phi_compare = False
@@ -44,7 +44,7 @@ else:
     dframe = pd.concat(frames)
 
 #dframe = dframe.query("y_test_probxgboost>0.5")
-#dframe = dframe.query("pt_cand > 4")
+#dframe = dframe.query("pt_cand > 10")
 #dframe = dframe.query("pt_cand < 10")
 dfreco = dframe.reset_index(drop = True)
 
@@ -164,13 +164,8 @@ if (plots):
     h_pt_cand.Draw()
     cYields.SaveAs("h_pt_cand.png")
 
-start = time.time()
 grouped = dfreco.groupby(["run_number","ev_id"])
-end = time.time()
-print("groupby done in", end - start, "sec")
-start = time.time()
 grouplen = pd.array(grouped.size())
-end = time.time()
 gmin = grouplen.min()
 gmax = grouplen.max()
 g_bins = gmax - gmin
@@ -186,7 +181,7 @@ cYields.SaveAs("h_grouplen.png")
 num_cores = int(cpu_count()/2)
 num_part  = num_cores*2
 
-print("start parallelizing with", num_cores, "cores")
+print("parallelizing will be done with", num_cores, "cores")
 def parallelize_df(df, func):
     df_split = np.array_split(df, num_part)
     pool = Pool(num_cores)
@@ -208,13 +203,13 @@ def filter_phi(df):
 
 start = time.time()
 
-filtrated_phi = parallelize_df(dfreco, filter_phi)
+filtrated_phi_0 = parallelize_df(dfreco, filter_phi)
 
 end2 = time.time()
 
-print("paralellizing is done in", end2 - start, "sec")
+print("paralellized calculations of delta phi is done in", end2 - start, "sec")
 
-filtrated_phi = filtrated_phi[filtrated_phi["delta_phi"] > 0]
+filtrated_phi = filtrated_phi_0[filtrated_phi_0["delta_phi"] > 0]
 
 h_d_phi_cand = TH1F("delta phi cand" , "", 200, filtrated_phi.delta_phi.min(),
         filtrated_phi.delta_phi.max())
@@ -224,49 +219,50 @@ h_d_phi_cand.Draw()
 cYields.SaveAs("h_d_phi_cand.png")
 
 if (make_phi_compare):
+
     cYields_2 = TCanvas('cYields_2', 'The Fit Canvas 2')
 
-    filtrated_phi_1 = filtrated_phi.query("pt_cand < 2")
+    filtrated_phi_1 = filtrated_phi.query("pt_cand < 4")
 
     d_phi_dist_1 =  filtrated_phi_1["delta_phi"]
 
-    filtrated_phi_2 = filtrated_phi.query("pt_cand > 2")
-    filtrated_phi_2 = filtrated_phi_2.query("pt_cand < 3")
+    filtrated_phi_2 = filtrated_phi.query("pt_cand > 4")
+    filtrated_phi_2 = filtrated_phi_2.query("pt_cand < 6")
 
     d_phi_dist_2 =  filtrated_phi_2["delta_phi"]
 
-    filtrated_phi_3 = filtrated_phi.query("pt_cand < 4")
-    filtrated_phi_3 = filtrated_phi_3.query("pt_cand > 3")
+    filtrated_phi_3 = filtrated_phi.query("pt_cand > 6")
+    filtrated_phi_3 = filtrated_phi_3.query("pt_cand < 8")
 
     d_phi_dist_3 =  filtrated_phi_3["delta_phi"]
 
-    filtrated_phi_4 = filtrated_phi.query("pt_cand < 5")
-    filtrated_phi_4 = filtrated_phi_4.query("pt_cand > 4")
+    filtrated_phi_4 = filtrated_phi.query("pt_cand > 8")
+    filtrated_phi_4 = filtrated_phi_4.query("pt_cand < 10")
 
     d_phi_dist_4 =  filtrated_phi_4["delta_phi"]
 
-    filtrated_phi_5 = filtrated_phi.query("pt_cand < 6")
-    filtrated_phi_5 = filtrated_phi_5.query("pt_cand > 5")
+    filtrated_phi_5 = filtrated_phi.query("pt_cand > 10")
+    filtrated_phi_5 = filtrated_phi_5.query("pt_cand < 24")
 
     d_phi_dist_5 =  filtrated_phi_5["delta_phi"]
 
-    h_d_phi_cand_1 = TH1F("delta phi cand, pt range:[1-2]" , "Normalized plot", 200,
+    h_d_phi_cand_1 = TH1F("delta phi cand, pt range:[<4]" , "Normalized plot", 200,
             d_phi_dist_1.min(), d_phi_dist_1.max())
     fill_hist(h_d_phi_cand_1, d_phi_dist_1)
     h_d_phi_cand_1.Scale(1/ h_d_phi_cand_1.Integral())
-    h_d_phi_cand_2 = TH1F("delta phi cand, pt range:[2-3]" , "", 200,
+    h_d_phi_cand_2 = TH1F("delta phi cand, pt range:[4-6]" , "", 200,
             d_phi_dist_1.min(), d_phi_dist_1.max())
     fill_hist(h_d_phi_cand_2, d_phi_dist_2)
     h_d_phi_cand_2.Scale(1/ h_d_phi_cand_2.Integral())
-    h_d_phi_cand_3 = TH1F("delta phi cand, pt range:[3-4]" , "", 200,
+    h_d_phi_cand_3 = TH1F("delta phi cand, pt range:[6-8]" , "", 200,
             d_phi_dist_1.min(), d_phi_dist_1.max())
     fill_hist(h_d_phi_cand_3, d_phi_dist_3)
     h_d_phi_cand_3.Scale(1/ h_d_phi_cand_3.Integral())
-    h_d_phi_cand_4 = TH1F("delta phi cand, pt range:[4-5]" , "", 200,
+    h_d_phi_cand_4 = TH1F("delta phi cand, pt range:[8-10]" , "", 200,
             d_phi_dist_1.min(), d_phi_dist_1.max())
     fill_hist(h_d_phi_cand_4, d_phi_dist_4)
     h_d_phi_cand_4.Scale(1/ h_d_phi_cand_4.Integral())
-    h_d_phi_cand_5 = TH1F("delta phi cand, pt range:[5-6]" , "", 200,
+    h_d_phi_cand_5 = TH1F("delta phi cand, pt range:[10-24]" , "", 200,
             d_phi_dist_1.min(), d_phi_dist_1.max())
     fill_hist(h_d_phi_cand_5, d_phi_dist_5)
     h_d_phi_cand_5.Scale(1/ h_d_phi_cand_5.Integral())
@@ -300,69 +296,87 @@ if (make_phi_compare):
     leg.Draw("same")
     cYields_2.SaveAs("h_d_phi_cand_compare.png")
 
-start = time.time()
+print("Delta phi cuts region A: [", a_cut_lower, a_cut_upper,"]")
+print("Delta phi cuts region B: [", b_cut_lower, a_cut_lower,"]&[",
+        a_cut_upper, b_cut_upper,"]")
 
 filtrated_phi_1 = filtrated_phi[filtrated_phi["delta_phi"] > b_cut_lower]
 filtrated_phi_1 = filtrated_phi_1[filtrated_phi_1["delta_phi"] < a_cut_lower]
 
-end = time.time()
-print("first B cuts", end - start)
-
 filtrated_phi_2 = filtrated_phi[filtrated_phi["delta_phi"] > a_cut_upper]
 filtrated_phi_2 = filtrated_phi_2[filtrated_phi_2["delta_phi"] < b_cut_upper]
-end2 = time.time()
-print("second B cuts", end2 - end)
-frames = [filtrated_phi_1, filtrated_phi_2]
 
+frames = [filtrated_phi_1, filtrated_phi_2]
 filtrated_phi_b = pd.concat(frames)
-end3 = time.time()
-print("new df concatation", end3 - end2)
+
 filtrated_phi_a = filtrated_phi[filtrated_phi["delta_phi"] > a_cut_lower]
 filtrated_phi_a = filtrated_phi_a[filtrated_phi_a["delta_phi"] < a_cut_upper]
-end4 = time.time()
 
-print(filtrated_phi_a)
-print(filtrated_phi_b)
-print("A cuts", end4 - end3)
-pt_vec = grouped["pt_cand"]
-print("pt_vect created, start looking for pt_max")
-start = time.time()
-def locator(df):
+print(filtrated_phi_a.groupby(["run_number", "ev_id"]).describe())
+
+def filter_max(df):
     grouped = df.groupby(["run_number", "ev_id"])
     pt_max = grouped["pt_cand"].idxmax()
     df = df.loc[pt_max, ]
     return df
-new_df_max = parallelize_df(dfreco, locator)
-pt_vec_max = new_df_max["pt_cand"]
-end = time.time()
-print("looking for pt_max", end - start)
 
+start = time.time()
+df_max = parallelize_df(filtrated_phi_0, filter_max)
+end = time.time()
+
+print("pt_max", df_max["pt_cand"])
+
+print("creating dataframe contains only pt_max lines:", end - start, "sec")
+
+frames = [filtrated_phi_a, df_max]
+new_df_total = pd.concat(frames)
+
+print("SHAAAAAPPPEEESSSS", filtrated_phi_a.shape, df_max.shape, new_df_total.shape)
+
+def filter_max_2(df):
+    df = df.groupby(["run_number", "ev_id"], sort = True).filter(lambda x: len(x) > 1)
+#    grouped = df.groupby(["run_number", "ev_id"])
+#    pt_max = grouped["pt_cand"].idxmax()
+#    df = df.loc[pt_max, ]
+    return df
+
+start = time.time()
+new_df_max = parallelize_df(new_df_total, filter_max_2)
+end = time.time()
+print("selecting necessary pt_max", end - start)
+
+print(new_df_max)
+
+pt_vec_max = new_df_max["pt_cand"]
 pt_vec_rest_a = filtrated_phi_a["pt_cand"]
 pt_vec_rest_b = filtrated_phi_b["pt_cand"]
 
-print(pt_vec_rest_a)
-print(pt_vec_rest_b)
-end2 = time.time()
-print("ready to next parallel:", end2 - end)
-# find positions of max and min elements in group
+print("HEEEEERRRRREEEEEE!!!!!", len(pt_vec_max), len(pt_vec_rest_a))
 
-
-end3 = time.time()
-print("parallel done", end3 - end2)
 phi_max_vec = new_df_max["phi_cand"]
 phi_vec_a = filtrated_phi_a["phi_cand"]
 phi_vec_b = filtrated_phi_b["phi_cand"]
 
+print("HEEEEERRRRREEEEEE!!!!!", len(phi_max_vec), len(phi_vec_a))
 eta_max_vec = new_df_max["eta_cand"]
 eta_vec_a = filtrated_phi_a["eta_cand"]
 eta_vec_b = filtrated_phi_b["eta_cand"]
 
+print("HEEEEERRRRREEEEEE!!!!!", len(eta_max_vec), len(eta_vec_a))
 inv_mass_max_vec = new_df_max["inv_mass"]
 inv_mass_vec_a = filtrated_phi_a["inv_mass"]
 inv_mass_vec_b = filtrated_phi_b["inv_mass"]
 
-end4 = time.time()
-print("vectors created", end4 - end3)
+print("HEEEEERRRRREEEEEE!!!!!", len(inv_mass_max_vec), len(inv_mass_vec_a))
+
+cYields = TCanvas('cYields', 'The Fit Canvas')
+h_DDbar_mass = TH2F("Dbar-D plot" , "", 200,
+        inv_mass_vec_a.min(), inv_mass_vec_a.max(), 200,
+        inv_mass_max_vec.min(), inv_mass_max_vec.max())
+DDbar = np.column_stack((inv_mass_vec_a, inv_mass_max_vec))
+fill_hist(h_DDbar_mass, DDbar)
+h_eta_phi.Draw("colz")
+cYields.SaveAs("h_DDbar.png")
 
 cYields.SetLogy(False)
 h_first_cand_mass = TH1F("inv_mass of the first cand" , "", 200,
@@ -377,9 +391,9 @@ fill_hist(h_second_cand_mass_b, inv_mass_vec_b)
 h_first_cand_mass.SetLineColor(kBlack)
 h_second_cand_mass_a.SetLineColor(kRed)
 h_second_cand_mass_b.SetLineColor(kBlue)
-#h_first_cand_mass.Draw()
-h_second_cand_mass_a.SetStats(0)
-h_second_cand_mass_a.Draw("")
+h_first_cand_mass.Draw()
+h_first_cand_mass.SetStats(0)
+h_second_cand_mass_a.Draw("same")
 h_second_cand_mass_b.Draw("same")
 leg = TLegend(0.6, 0.7, 0.95, 0.87)
 leg.SetBorderSize(0)
@@ -387,7 +401,7 @@ leg.SetFillColor(0)
 leg.SetFillStyle(0)
 leg.SetTextFont(42)
 leg.SetTextSize(0.035)
-#leg.AddEntry(h_d_phi_cand_1, h_d_phi_cand_1.GetName(),"L")
+leg.AddEntry(h_first_cand_mass, h_first_cand_mass.GetName(),"L")
 leg.AddEntry(h_second_cand_mass_a, h_second_cand_mass_a.GetName(),"L")
 leg.AddEntry(h_second_cand_mass_b, h_second_cand_mass_b.GetName(),"L")
 leg.Draw("same")
