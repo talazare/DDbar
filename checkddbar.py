@@ -13,11 +13,11 @@ from multiprocessing import Pool, cpu_count
 import lz4.frame
 import time
 
-debug = True
-#debug = False
+#debug = True
+debug = False
 
-plots = True
-#plots = False
+#plots = True
+plots = False
 
 #make_phi_compare = True
 make_phi_compare = False
@@ -182,8 +182,16 @@ num_cores = int(cpu_count()/2)
 num_part  = num_cores*2
 
 print("parallelizing will be done with", num_cores, "cores")
-def parallelize_df(df, func):
-    df_split = np.array_split(df, num_part)
+def parallelize_df(df, func, num_cores=num_cores, num_part=num_part):
+    #sort dataframe
+    df.sort_values(["run_number", "ev_id"], inplace=True)
+    split_indices = (df.shape[0] // num_part) * np.arange(1, num_part, dtype=np.int)
+    for i in range (0, num_part-1):
+        while ( df.iloc[split_indices[i]][["run_number", "ev_id"]] ==
+                df.iloc[split_indices[i]-1][["run_number", "ev_id"]]).all():
+            split_indices[i] += 1
+    df_split = np.split(df, split_indices)
+    #df_split = np.array_split(df, num_part)
     pool = Pool(num_cores)
     df = pd.concat(pool.map(func, df_split))
     pool.close()
@@ -208,6 +216,8 @@ filtrated_phi_0 = parallelize_df(dfreco, filter_phi)
 end2 = time.time()
 
 print("paralellized calculations of delta phi is done in", end2 - start, "sec")
+
+# so far everything is perfect
 
 filtrated_phi = filtrated_phi_0[filtrated_phi_0["delta_phi"] > 0]
 
@@ -312,7 +322,7 @@ filtrated_phi_b = pd.concat(frames)
 filtrated_phi_a = filtrated_phi[filtrated_phi["delta_phi"] > a_cut_lower]
 filtrated_phi_a = filtrated_phi_a[filtrated_phi_a["delta_phi"] < a_cut_upper]
 
-print(filtrated_phi_a.groupby(["run_number", "ev_id"]).describe())
+#so far it's fine
 
 def filter_max(df):
     grouped = df.groupby(["run_number", "ev_id"])
@@ -323,70 +333,90 @@ def filter_max(df):
 start = time.time()
 df_max = parallelize_df(filtrated_phi_0, filter_max)
 end = time.time()
-
-print("pt_max", df_max["pt_cand"])
-
 print("creating dataframe contains only pt_max lines:", end - start, "sec")
 
-frames = [filtrated_phi_a, df_max]
-new_df_total = pd.concat(frames)
-
-print("SHAAAAAPPPEEESSSS", filtrated_phi_a.shape, df_max.shape, new_df_total.shape)
+frames_a = [filtrated_phi_a, df_max]
+new_df_total_a = pd.concat(frames_a)
+new_df_total_a = new_df_total_a.reset_index(drop = True)
+frames_b = [filtrated_phi_b, df_max]
+new_df_total_b = pd.concat(frames_b)
+new_df_total_b = new_df_total_b.reset_index(drop = True)
 
 def filter_max_2(df):
-    df = df.groupby(["run_number", "ev_id"], sort = True).filter(lambda x: len(x) > 1)
-#    grouped = df.groupby(["run_number", "ev_id"])
-#    pt_max = grouped["pt_cand"].idxmax()
-#    df = df.loc[pt_max, ]
+    df = df.groupby(["run_number", "ev_id"], sort=True).filter(lambda x:
+            len(x) > 1)
+#    df["pt_cand_max"] = 0.
+#    df["inv_cand_max"] = 0.
+#    df["phi_cand_max"] = 0.
+#    df["eta_cand_max"] = 0.
+    grouped = df.groupby(["run_number", "ev_id"])
+    for name, group in grouped:
+        df.loc[group.index, "pt_cand_max"]  = df.loc[group["pt_cand"].idxmax(), "pt_cand"]
+        df.loc[group.index, "inv_cand_max"] = df.loc[group["pt_cand"].idxmax(), "inv_mass"]
+        df.loc[group.index, "phi_cand_max"] = df.loc[group["pt_cand"].idxmax(), "phi_cand"]
+        df.loc[group.index, "eta_cand_max"] = df.loc[group["pt_cand"].idxmax(), "eta_cand"]
+    pt_max = grouped["pt_cand"].idxmax()
+    df = df[df["delta_phi"] > 0]
     return df
 
+
 start = time.time()
-new_df_max = parallelize_df(new_df_total, filter_max_2)
+new_df_max_a = parallelize_df(new_df_total_a, filter_max_2)
+new_df_max_b = parallelize_df(new_df_total_b, filter_max_2)
+#new_df_max = filter_max_2(new_df_total)
 end = time.time()
-print("selecting necessary pt_max", end - start)
+print("creating primary particles vectors", end - start)
 
-print(new_df_max)
-
-pt_vec_max = new_df_max["pt_cand"]
+pt_vec_max_a = new_df_max_a["pt_cand_max"]
+pt_vec_max_b = new_df_max_b["pt_cand_max"]
 pt_vec_rest_a = filtrated_phi_a["pt_cand"]
 pt_vec_rest_b = filtrated_phi_b["pt_cand"]
 
-print("HEEEEERRRRREEEEEE!!!!!", len(pt_vec_max), len(pt_vec_rest_a))
+#print(len(pt_vec_max_a), len(pt_vec_rest_a), len(pt_vec_max_b),
+#        len(pt_vec_rest_b))
 
-phi_max_vec = new_df_max["phi_cand"]
+phi_max_vec_a = new_df_max_a["phi_cand_max"]
+phi_max_vec_b = new_df_max_b["phi_cand_max"]
 phi_vec_a = filtrated_phi_a["phi_cand"]
 phi_vec_b = filtrated_phi_b["phi_cand"]
 
-print("HEEEEERRRRREEEEEE!!!!!", len(phi_max_vec), len(phi_vec_a))
-eta_max_vec = new_df_max["eta_cand"]
+eta_max_vec_a = new_df_max_a["eta_cand_max"]
+eta_max_vec_b = new_df_max_b["eta_cand_max"]
 eta_vec_a = filtrated_phi_a["eta_cand"]
 eta_vec_b = filtrated_phi_b["eta_cand"]
 
-print("HEEEEERRRRREEEEEE!!!!!", len(eta_max_vec), len(eta_vec_a))
-inv_mass_max_vec = new_df_max["inv_mass"]
+inv_mass_max_vec_a = new_df_max_a["inv_cand_max"]
+inv_mass_max_vec_b = new_df_max_b["inv_cand_max"]
 inv_mass_vec_a = filtrated_phi_a["inv_mass"]
 inv_mass_vec_b = filtrated_phi_b["inv_mass"]
 
-print("HEEEEERRRRREEEEEE!!!!!", len(inv_mass_max_vec), len(inv_mass_vec_a))
+cYields = TCanvas('cYields', 'The Fit Canvas')
+h_DDbar_mass_a = TH2F("Dbar-D plot region A" , "", 200,
+        inv_mass_vec_a.min(), inv_mass_vec_a.max(), 200,
+        inv_mass_max_vec_a.min(), inv_mass_max_vec_a.max())
+DDbar_a = np.column_stack((inv_mass_vec_a, inv_mass_max_vec_a))
+fill_hist(h_DDbar_mass_a, DDbar_a)
+h_DDbar_mass_a.Draw("colz")
+cYields.SaveAs("h_DDbar_A.png")
 
 cYields = TCanvas('cYields', 'The Fit Canvas')
-h_DDbar_mass = TH2F("Dbar-D plot" , "", 200,
-        inv_mass_vec_a.min(), inv_mass_vec_a.max(), 200,
-        inv_mass_max_vec.min(), inv_mass_max_vec.max())
-DDbar = np.column_stack((inv_mass_vec_a, inv_mass_max_vec))
-fill_hist(h_DDbar_mass, DDbar)
-h_eta_phi.Draw("colz")
-cYields.SaveAs("h_DDbar.png")
+h_DDbar_mass_b = TH2F("Dbar-D plot region B" , "", 200,
+        inv_mass_vec_b.min(), inv_mass_vec_b.max(), 200,
+        inv_mass_max_vec_b.min(), inv_mass_max_vec_b.max())
+DDbar_b = np.column_stack((inv_mass_vec_b, inv_mass_max_vec_b))
+fill_hist(h_DDbar_mass_b, DDbar_b)
+h_DDbar_mass_b.Draw("colz")
+cYields.SaveAs("h_DDbar_B.png")
 
 cYields.SetLogy(False)
 h_first_cand_mass = TH1F("inv_mass of the first cand" , "", 200,
-        inv_mass_max_vec.min(), inv_mass_max_vec.max())
-fill_hist(h_first_cand_mass, inv_mass_max_vec)
+        inv_mass_max_vec_a.min(), inv_mass_max_vec_a.max())
+fill_hist(h_first_cand_mass, inv_mass_max_vec_a)
 h_second_cand_mass_a = TH1F("inv_mass in range A" , "", 200,
-        inv_mass_max_vec.min(), inv_mass_max_vec.max())
+        inv_mass_max_vec_a.min(), inv_mass_max_vec_a.max())
 fill_hist(h_second_cand_mass_a, inv_mass_vec_a)
 h_second_cand_mass_b = TH1F("inv_mass in range B" , "", 200,
-        inv_mass_max_vec.min(), inv_mass_max_vec.max())
+        inv_mass_max_vec_a.min(), inv_mass_max_vec_a.max())
 fill_hist(h_second_cand_mass_b, inv_mass_vec_b)
 h_first_cand_mass.SetLineColor(kBlack)
 h_second_cand_mass_a.SetLineColor(kRed)
@@ -409,7 +439,7 @@ cYields.SaveAs("h_inv_mass_cand.png")
 
 h_first_cand_pt = TH1F("pt of the first cand" , "", 200,
         pt_vec_rest_a.min(), pt_vec_rest_a.max())
-fill_hist(h_first_cand_pt, pt_vec_max)
+fill_hist(h_first_cand_pt, pt_vec_max_a)
 h_second_cand_pt_a = TH1F("pt in range A" , "", 200,
         pt_vec_rest_a.min(), pt_vec_rest_a.max())
 fill_hist(h_second_cand_pt_a, pt_vec_rest_a)
@@ -436,13 +466,13 @@ leg.Draw("same")
 cYields.SaveAs("h_pt_cand_max_min.png")
 
 h_first_cand_eta = TH1F("eta of the first cand" , "", 200,
-        eta_max_vec.min(), eta_max_vec.max())
-fill_hist(h_first_cand_eta, eta_max_vec)
+        eta_max_vec_a.min(), eta_max_vec_a.max())
+fill_hist(h_first_cand_eta, eta_max_vec_a)
 h_second_cand_eta_a = TH1F("eta in range A" , "", 200,
-        eta_max_vec.min(), eta_max_vec.max())
+        eta_max_vec_a.min(), eta_max_vec_a.max())
 fill_hist(h_second_cand_eta_a, eta_vec_a)
 h_second_cand_eta_b = TH1F("eta in range B" , "", 200,
-        eta_max_vec.min(), eta_max_vec.max())
+        eta_max_vec_a.min(), eta_max_vec_a.max())
 fill_hist(h_second_cand_eta_b, eta_vec_b)
 h_first_cand_eta.SetLineColor(kBlack)
 h_second_cand_eta_a.SetLineColor(kRed)
