@@ -66,7 +66,7 @@ print("Data loaded in", end - start, "sec")
 
 if(debug):
     print("Debug mode: reduced data")
-    dfreco = dfreco[:20000]
+    dfreco = dfreco[:200000]
 print("Size of data", dfreco.shape)
 
 print(dfreco.columns)
@@ -191,7 +191,7 @@ cYields.SaveAs("h_grouplen.png")
 
 #parallelized functions over the dataframe
 
-num_cores = int(cpu_count()/2)
+num_cores = int(cpu_count())
 num_part  = num_cores*2
 
 print("parallelizing will be done with", num_cores, "cores")
@@ -225,14 +225,12 @@ def filter_phi(df):
 start = time.time()
 
 filtrated_phi_0 = parallelize_df(dfreco, filter_phi)
-print(filtrated_phi_0.shape)
-# return wrong thing
 
 end2 = time.time()
 
 print("paralellized calculations of delta phi is done in", end2 - start, "sec")
 
-input()
+# so far everything is perfect
 
 filtrated_phi = filtrated_phi_0[filtrated_phi_0["delta_phi"] > 0]
 
@@ -364,22 +362,38 @@ def filter_max_2(df):
 #    df["inv_cand_max"] = 0.
 #    df["phi_cand_max"] = 0.
 #    df["eta_cand_max"] = 0.
-    print(df.shape)
     def max_el(group):
         df.loc[group.index, "pt_cand_max"]  = df.loc[group["pt_cand"].idxmax(), "pt_cand"]
         df.loc[group.index, "inv_cand_max"] = df.loc[group["pt_cand"].idxmax(), "inv_mass"]
         df.loc[group.index, "phi_cand_max"] = df.loc[group["pt_cand"].idxmax(), "phi_cand"]
         df.loc[group.index, "eta_cand_max"] = df.loc[group["pt_cand"].idxmax(), "eta_cand"]
         return df
-    print(df.shape)
     grouped = df.groupby(["run_number", "ev_id"]).apply(max_el)
     df = df[df["delta_phi"] > 0]
     return df
 
+#def filter_max_2(df):
+#    df = df.groupby(["run_number", "ev_id"], sort=True).filter(lambda x:
+#            len(x) > 1)
+##    df["pt_cand_max"] = 0.
+##    df["inv_cand_max"] = 0.
+##    df["phi_cand_max"] = 0.
+##    df["eta_cand_max"] = 0.
+#    grouped = df.groupby(["run_number", "ev_id"])
+#    for name, group in grouped:
+#        df.loc[group.index, "pt_cand_max"]  = df.loc[group["pt_cand"].idxmax(), "pt_cand"]
+#        df.loc[group.index, "inv_cand_max"] = df.loc[group["pt_cand"].idxmax(), "inv_mass"]
+#        df.loc[group.index, "phi_cand_max"] = df.loc[group["pt_cand"].idxmax(), "phi_cand"]
+#        df.loc[group.index, "eta_cand_max"] = df.loc[group["pt_cand"].idxmax(), "eta_cand"]
+#    pt_max = grouped["pt_cand"].idxmax()
+#    df = df[df["delta_phi"] > 0]
+#    return df
+
+
 start = time.time()
 new_df_max_a = parallelize_df(new_df_total_a, filter_max_2)
 new_df_max_b = parallelize_df(new_df_total_b, filter_max_2)
-new_df_max_tot = parallelize_df(filtrated_phi, filter_max_2)
+#new_df_max = filter_max_2(new_df_total)
 end = time.time()
 print("creating primary particles vectors", end - start)
 
@@ -387,6 +401,9 @@ pt_vec_max_a = new_df_max_a["pt_cand_max"]
 pt_vec_max_b = new_df_max_b["pt_cand_max"]
 pt_vec_rest_a = filtrated_phi_a["pt_cand"]
 pt_vec_rest_b = filtrated_phi_b["pt_cand"]
+
+#print(len(pt_vec_max_a), len(pt_vec_rest_a), len(pt_vec_max_b),
+#        len(pt_vec_rest_b))
 
 phi_max_vec_a = new_df_max_a["phi_cand_max"]
 phi_max_vec_b = new_df_max_b["phi_cand_max"]
@@ -403,42 +420,27 @@ inv_mass_max_vec_b = new_df_max_b["inv_cand_max"]
 inv_mass_vec_a = filtrated_phi_a["inv_mass"]
 inv_mass_vec_b = filtrated_phi_b["inv_mass"]
 
-print(new_df_max_tot.inv_mass.min(), new_df_max_tot.inv_mass.max(),
-        new_df_max_tot.inv_mass.min(), new_df_max_tot.inv_mass.max())
 
-h_DDbar_mass_tot = TH2F("Dbar-D plot" , "", 200,
-        new_df_max_tot.inv_mass.min(), new_df_max_tot.inv_mass.max(), 200,
-        new_df_max_tot.inv_mass.min(), new_df_max_tot.inv_mass.max())
-#DDbar_a = np.column_stack((inv_mass_vec_a, inv_mass_max_vec_a))
-for i in range (0, len(new_df_max_tot.inv_mass)-1):
-        h_DDbar_mass_tot.Fill(new_df_max_tot.inv_mass.tolist()[i],
-                new_df_max_tot.inv_cand_max.tolist()[i])
-h_DDbar_mass_tot.SetOption("lego2z")
-h_DDbar_mass_tot.Draw("LEGO2Z")
-cYields.SaveAs("h_DDbar_tot.png")
-
-
-h_DDbar_mass_a = TH2F("Dbar-D plot region A" , "", 200,
+cYields = TCanvas('cYields', 'The Fit Canvas')
+h_DDbar_mass_a = TH3F("Dbar-D plot region A" , "", 200,
         inv_mass_vec_a.min(), inv_mass_vec_a.max(), 200,
-        inv_mass_max_vec_a.min(), inv_mass_max_vec_a.max())
-#DDbar_a = np.column_stack((inv_mass_vec_a, inv_mass_max_vec_a))
-for i in range (0, len(inv_mass_vec_a)-1):
-        h_DDbar_mass_a.Fill(inv_mass_vec_a.tolist()[i],
-                inv_mass_max_vec_a.tolist()[i])
-h_DDbar_mass_a.SetOption("lego2z")
-h_DDbar_mass_a.Draw("")
+        inv_mass_max_vec_a.min(), inv_mass_max_vec_a.max(), 200, 0,
+        len(inv_mass_max_vec_a))
+DDbar_a = np.column_stack((inv_mass_vec_a, inv_mass_max_vec_a,
+    np.ones([len(inv_mass_vec_a), 1])))
+fill_hist(h_DDbar_mass_a, DDbar_a)
+h_DDbar_mass_a.Draw()
 cYields.SaveAs("h_DDbar_A.png")
-
-
-h_DDbar_mass_b = TH2F("Dbar-D plot region B" , "", 200,
+input()
+cYields = TCanvas('cYields', 'The Fit Canvas')
+cYields.SetLogz(True)
+h_DDbar_mass_b = TH3F("Dbar-D plot region B" , "", 200,
         inv_mass_vec_b.min(), inv_mass_vec_b.max(), 200,
-        inv_mass_max_vec_b.min(), inv_mass_max_vec_b.max())
-#DDbar_b = np.column_stack((inv_mass_vec_b, inv_mass_max_vec_b))
-for i in range (0, len(inv_mass_vec_b)-1):
-        h_DDbar_mass_b.Fill(inv_mass_vec_b.tolist()[i],
-                inv_mass_max_vec_b.tolist()[i])
-h_DDbar_mass_b.SetOption("lego2z")
-h_DDbar_mass_b.Draw("")
+        inv_mass_max_vec_b.min(), inv_mass_max_vec_b.max(), 200, 0,
+        len(inv_mass_max_vec_b))
+DDbar_b = np.column_stack((inv_mass_vec_b, inv_mass_max_vec_b))
+fill_hist(h_DDbar_mass_b, DDbar_b)
+h_DDbar_mass_b.Draw("colz")
 cYields.SaveAs("h_DDbar_B.png")
 
 cYields.SetLogy(False)
